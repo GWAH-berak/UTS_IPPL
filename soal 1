@@ -1,0 +1,302 @@
+import matplotlib
+matplotlib.use('Agg')
+import matplotlib.pyplot as plt
+import matplotlib.patches as mpatches
+import numpy as np
+from dataclasses import dataclass
+from typing import Union
+
+
+def validate_input(value, name: str) -> tuple[bool, str]:
+    # Cek tipe data
+    if not isinstance(value, (int, float)):
+        return False, f"ERROR: {name} harus bertipe numerik (int/float), bukan {type(value).__name__}"
+    # Cek NaN atau Infinity
+    if isinstance(value, float) and (value != value or abs(value) == float('inf')):
+        return False, f"ERROR: {name} tidak boleh NaN atau Infinity"
+    # Cek rentang
+    if value < 0 or value > 100:
+        return False, f"ERROR: {name} ({value}) di luar rentang 0–100"
+    return True, f"OK: {name} = {value}"
+
+
+def hitung_nilai_akhir(tugas: float, uts: float, uas: float) -> Union[float, str]:
+    # Validasi semua input
+    for val, nama in [(tugas, "Tugas"), (uts, "UTS"), (uas, "UAS")]:
+        valid, pesan = validate_input(val, nama)
+        if not valid:
+            return pesan
+
+    nilai_akhir = (0.30 * tugas) + (0.30 * uts) + (0.40 * uas)
+    return round(nilai_akhir, 2)
+
+
+def tentukan_grade(nilai_akhir) -> str:
+    if isinstance(nilai_akhir, str):
+        return "INVALID"
+    if nilai_akhir < 50:
+        return "E"
+    elif nilai_akhir < 65:
+        return "D"
+    elif nilai_akhir < 75:
+        return "C"
+    elif nilai_akhir < 85:
+        return "B"
+    else:
+        return "A"
+
+
+def jalankan_test_case(test_id, tugas, uts, uas, deskripsi, expected_valid=True):
+    hasil = hitung_nilai_akhir(tugas, uts, uas)
+    if isinstance(hasil, str):  # error
+        grade = "INVALID"
+        status = "INVALID (Error)"
+        valid = False
+    else:
+        grade = tentukan_grade(hasil)
+        status = f"VALID → Nilai Akhir = {hasil:.2f}, Grade = {grade}"
+        valid = True
+
+    passed = valid == expected_valid
+    return {
+        "id": test_id,
+        "tugas": tugas,
+        "uts": uts,
+        "uas": uas,
+        "deskripsi": deskripsi,
+        "hasil": hasil,
+        "grade": grade,
+        "status": status,
+        "expected_valid": expected_valid,
+        "passed": passed
+    }
+
+
+def buat_test_bva():
+    MID = 50
+    test_cases = []
+
+    bva_tugas = [
+        ("BVA-T1", -1,  MID, MID, "Tugas: Out of Bound bawah (-1)",False),
+        ("BVA-T2",  0,  MID, MID, "Tugas: Minimum (0)",True),
+        ("BVA-T3",  1,  MID, MID, "Tugas: Minimum+1 (1)",True),
+        ("BVA-T4", 99,  MID, MID, "Tugas: Maximum-1 (99)",True),
+        ("BVA-T5",100,  MID, MID, "Tugas: Maximum (100)",True),
+        ("BVA-T6",101,  MID, MID, "Tugas: Out of Bound atas (101)",False),
+    ]
+
+    bva_uts = [
+        ("BVA-U1", MID, -1,  MID, "UTS: Out of Bound bawah (-1)",False),
+        ("BVA-U2", MID,  0,  MID, "UTS: Minimum (0)",True),
+        ("BVA-U3", MID,  1,  MID, "UTS: Minimum+1 (1)",True),
+        ("BVA-U4", MID, 99,  MID, "UTS: Maximum-1 (99)",True),
+        ("BVA-U5", MID,100,  MID, "UTS: Maximum (100)",True),
+        ("BVA-U6", MID,101,  MID, "UTS: Out of Bound atas (101)",False),
+    ]
+
+    bva_uas = [
+        ("BVA-S1", MID, MID,  -1, "UAS: Out of Bound bawah (-1)",False),
+        ("BVA-S2", MID, MID,   0, "UAS: Minimum (0)", True),
+        ("BVA-S3", MID, MID,   1, "UAS: Minimum+1 (1)",True),
+        ("BVA-S4", MID, MID,  99, "UAS: Maximum-1 (99)",True),
+        ("BVA-S5", MID, MID, 100, "UAS: Maximum (100)",True),
+        ("BVA-S6", MID, MID, 101, "UAS: Out of Bound atas (101)",False),
+    ]
+
+    for tc in bva_tugas + bva_uts + bva_uas:
+        test_cases.append(jalankan_test_case(*tc))
+
+    return test_cases
+
+
+def buat_test_multi_param():
+    test_cases = [
+        ("MP-01",   0,   0,   0, "Semua minimum (0,0,0)",True),
+        ("MP-02", 100, 100, 100, "Semua maximum (100,100,100)",True),
+        ("MP-03",   0, 100, 100, "Tugas=min, UTS+UAS=max",True),
+        ("MP-04", 100,   0, 100, "UTS=min, Tugas+UAS=max",True),
+        ("MP-05", 100, 100,   0, "UAS=min, Tugas+UTS=max",True),
+        ("MP-06",   1,   1,   1, "Semua min+1 (1,1,1)",True),
+        ("MP-07",  99,  99,  99, "Semua max-1 (99,99,99)",True),
+        ("MP-08",   0,   0, 100, "Tugas=0, UTS=0, UAS=100",True),
+        ("MP-09", 100,   0,   0, "Tugas=100, UTS=0, UAS=0",True),
+        ("MP-10",  -1,  -1,  -1, "Semua out of bound bawah",False),
+        ("MP-11", 101, 101, 101, "Semua out of bound atas",False),
+        ("MP-12",   0, 101,  50, "UTS out of bound atas, lainnya valid",False),
+    ]
+    result = []
+    for tc in test_cases:
+        result.append(jalankan_test_case(*tc))
+    return result
+
+
+def buat_test_robustness():
+    extreme_tests = [
+        ("ROB-E1",  -999,  50,   50, "Tugas sangat negatif (-999)", False),
+        ("ROB-E2",   999,  50,   50, "Tugas sangat besar (999)",False),
+        ("ROB-E3",    50, -999,  50, "UTS sangat negatif (-999)",False),
+        ("ROB-E4",    50,  999,  50, "UTS sangat besar (999)", False),
+        ("ROB-E5",    50,  50, -999, "UAS sangat negatif (-999)", False),
+        ("ROB-E6",    50,  50,  999, "UAS sangat besar (999)", False),
+        ("ROB-E7",  0.0,  0.0,  0.0,"Semua float minimum (0.0)", True),
+        ("ROB-E8", 99.9, 99.9, 99.9,"Semua float mendekati max (99.9)", True),
+        ("ROB-E9", 100.0,100.0,100.0,"Semua float maximum (100.0)",True),
+    ]
+
+    result = []
+    for tc in extreme_tests:
+        result.append(jalankan_test_case(*tc))
+
+    # Test tipe data salah
+    invalid_type_tests = [
+        ("ROB-T1", "80",   50,    50,  "Tugas bertipe string '80'"),
+        ("ROB-T2",   80,  "50",   50,  "UTS bertipe string '50'"),
+        ("ROB-T3",   80,   50,  "90",  "UAS bertipe string '90'"),
+        ("ROB-T4",  None,   50,   50,  "Tugas bertipe None"),
+        ("ROB-T5",   [80],  50,   50,  "Tugas bertipe list [80]"),
+        ("ROB-T6",   True,  50,   50,  "Tugas bertipe bool True (edge case)"),
+    ]
+
+    for test_id, tugas, uts, uas, deskripsi in invalid_type_tests:
+        if isinstance(tugas, bool) or isinstance(uts, bool) or isinstance(uas, bool):
+            r = jalankan_test_case(test_id, tugas, uts, uas, deskripsi, True)
+        else:
+            r = jalankan_test_case(test_id, tugas, uts, uas, deskripsi, False)
+        result.append(r)
+
+    return result
+
+def tampilkan_hasil(test_cases, judul):
+    print(f"\n{'='*90}")
+    print(f" {judul}")
+    print(f"{'='*90}")
+    print(f"{'ID':<10} {'Tugas':>7} {'UTS':>7} {'UAS':>7} {'Hasil':>8} {'Grade':>5} {'Pass':>5}  Deskripsi")
+    print(f"{'-'*90}")
+    for tc in test_cases:
+        hasil_str = f"{tc['hasil']:.2f}" if isinstance(tc['hasil'], float) else "ERROR"
+        pass_str  = "✓" if tc['passed'] else "✗"
+        print(f"{tc['id']:<10} {str(tc['tugas']):>7} {str(tc['uts']):>7} {str(tc['uas']):>7} "
+              f"{hasil_str:>8} {tc['grade']:>5} {pass_str:>5}  {tc['deskripsi']}")
+    passed = sum(1 for t in test_cases if t['passed'])
+    print(f"\n  Total: {len(test_cases)} test | PASS: {passed} | FAIL: {len(test_cases)-passed}")
+
+
+import matplotlib.pyplot as plt
+import os
+
+def buat_grafik(semua_test, output_path="grafik_hasil.png"):
+    valid_tests = [t for t in semua_test if isinstance(t['hasil'], (int, float))]
+    nilai_akhir_list = [t['hasil'] for t in valid_tests]
+    grade_list       = [t['grade'] for t in valid_tests]
+
+    fig, axes = plt.subplots(1, 2, figsize=(14, 6))
+    fig.suptitle("Distribusi Hasil Pengujian - Sistem Informasi Akademik",
+                 fontsize=14, fontweight='bold', y=1.02)
+
+    # Histogram nilai
+    ax1 = axes[0]
+    ax1.hist(nilai_akhir_list, bins=10, color='steelblue', edgecolor='white',
+             linewidth=0.8, alpha=0.85)
+
+    for batas, warna, label in [
+        (50, 'red', 'E/D: 50'),
+        (65, 'orange', 'D/C: 65'),
+        (75, 'green', 'C/B: 75'),
+        (85, 'purple', 'B/A: 85')
+    ]:
+        ax1.axvline(batas, color=warna, linestyle='--', linewidth=1.5, label=label)
+
+    ax1.set_title("Distribusi Nilai Akhir", fontweight='bold')
+    ax1.set_xlabel("Nilai Akhir")
+    ax1.set_ylabel("Frekuensi")
+    ax1.legend(fontsize=8)
+    ax1.grid(axis='y', alpha=0.3)
+
+    # Bar chart grade
+    ax2 = axes[1]
+    grade_urut = ['A', 'B', 'C', 'D', 'E']
+    warna_grade = ['#2ecc71', '#3498db', '#f39c12', '#e74c3c', '#95a5a6']
+    jumlah_grade = [grade_list.count(g) for g in grade_urut]
+
+    bars = ax2.bar(grade_urut, jumlah_grade, color=warna_grade,
+                   edgecolor='white', linewidth=0.8)
+
+    for bar, jml in zip(bars, jumlah_grade):
+        if jml > 0:
+            ax2.text(bar.get_x() + bar.get_width()/2,
+                     bar.get_height() + 0.1,
+                     str(jml), ha='center', va='bottom',
+                     fontweight='bold')
+
+    ax2.set_title("Distribusi Grade", fontweight='bold')
+    ax2.set_xlabel("Grade")
+    ax2.set_ylabel("Jumlah Test Case")
+    ax2.grid(axis='y', alpha=0.3)
+
+    plt.tight_layout()
+
+    # Simpan file
+    plt.savefig(output_path, dpi=150, bbox_inches='tight')
+    plt.close()
+
+    print(f"\n  [Grafik disimpan: {os.path.abspath(output_path)}]")
+    return output_path
+
+def analisis_hasil(semua_test):
+    valid   = [t for t in semua_test if isinstance(t['hasil'], (int, float))]
+    invalid = [t for t in semua_test if not isinstance(t['hasil'], (int, float))]
+
+    print(f"\n{'='*60}")
+    print(" ANALISIS HASIL PENGUJIAN")
+    print(f"{'='*60}")
+    print(f"  Total test case  : {len(semua_test)}")
+    print(f"  Input valid      : {len(valid)}")
+    print(f"  Input invalid    : {len(invalid)}")
+
+    if valid:
+        nilai = [t['hasil'] for t in valid]
+        print(f"\n  Statistik Nilai Akhir (input valid):")
+        print(f"    Minimum : {min(nilai):.2f}")
+        print(f"    Maximum : {max(nilai):.2f}")
+        print(f"    Rata-rata: {sum(nilai)/len(nilai):.2f}")
+
+        from collections import Counter
+        grade_count = Counter(t['grade'] for t in valid)
+        print(f"\n  Distribusi Grade:")
+        for g in ['A','B','C','D','E']:
+            bar = '█' * grade_count.get(g, 0)
+            print(f"    Grade {g}: {grade_count.get(g, 0):3d}  {bar}")
+
+    passed = sum(1 for t in semua_test if t['passed'])
+    print(f"\n  Hasil Pass/Fail:")
+    print(f"    PASS : {passed}")
+    print(f"    FAIL : {len(semua_test)-passed}")
+    print(f"\n  Anomali:")
+    if len(semua_test) - passed == 0:
+        print("    ✓ Tidak ditemukan anomali. Semua test case sesuai ekspektasi.")
+    else:
+        print("    ✗ Terdapat test case yang hasilnya tidak sesuai ekspektasi.")
+        for t in semua_test:
+            if not t['passed']:
+                print(f"      - {t['id']}: {t['deskripsi']}")
+
+    print(f"\n  Kesimpulan Distribusi:")
+    print("    Distribusi grade mencerminkan rentang nilai yang diuji secara boundary.")
+    print("    Nilai ekstrem (0,0,0) menghasilkan Grade E dan (100,100,100) Grade A.")
+    print("    Sistem menolak input di luar rentang 0–100 dan tipe data non-numerik.")
+
+
+if __name__ == "__main__":
+    print("  PENGUJIAN SISTEM INFORMASI AKADEMIK")
+
+    tc_bva   = buat_test_bva()
+    tc_multi = buat_test_multi_param()
+    tc_rob   = buat_test_robustness()
+
+    tampilkan_hasil(tc_bva,   "BAGIAN A: Boundary Value Analysis (per variabel)")
+    tampilkan_hasil(tc_multi, "BAGIAN B: Multi-Parameter Boundary Testing")
+    tampilkan_hasil(tc_rob,   "BAGIAN C: Robustness Testing")
+
+    semua = tc_bva + tc_multi + tc_rob
+    analisis_hasil(semua)
+    buat_grafik(semua)
