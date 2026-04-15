@@ -1,0 +1,260 @@
+import matplotlib
+matplotlib.use('Agg')
+import matplotlib.pyplot as plt
+import matplotlib.patches as mpatches
+from collections import Counter
+
+def evaluasi_kelulusan(kehadiran: float, nilai_akhir: float, status_bayar: str) -> dict:
+
+    c1_hadir  = kehadiran >= 75       # Kehadiran ≥ 75%
+    c2_nilai  = nilai_akhir >= 60     # Nilai Akhir ≥ 60
+    c3_bayar  = str(status_bayar).strip().upper() == "LUNAS"
+
+    # Evaluasi rule (prioritas dari atas)
+    if not c1_hadir:
+        keputusan = "TIDAK LULUS"
+        alasan    = "Kehadiran < 75%"
+    elif not c3_bayar:
+        keputusan = "TIDAK LULUS"
+        alasan    = "Pembayaran tidak lunas"
+    elif not c2_nilai:
+        keputusan = "TIDAK LULUS"
+        alasan    = "Nilai Akhir < 60"
+    else:
+        keputusan = "LULUS"
+        alasan    = "Semua syarat terpenuhi"
+
+    return {
+        "kehadiran"  : kehadiran,
+        "nilai_akhir": nilai_akhir,
+        "status_bayar": status_bayar,
+        "C1_hadir"   : c1_hadir,
+        "C2_nilai"   : c2_nilai,
+        "C3_bayar"   : c3_bayar,
+        "keputusan"  : keputusan,
+        "alasan"     : alasan,
+    }
+
+def cetak_decision_table():
+    header = f"\n{'='*80}\n DECISION TABLE SISTEM E-LEARNING\n{'='*80}"
+    print(header)
+
+    print("""
+KONDISI DAN AKSI:
+  Conditions (C):
+    C1: Kehadiran ≥ 75%        (T=Ya / F=Tidak)
+    C2: Nilai Akhir ≥ 60       (T=Ya / F=Tidak)
+    C3: Status Pembayaran=Lunas(T=Ya / F=Tidak)
+
+  Actions (A):
+    A1: LULUS
+    A2: TIDAK LULUS
+""")
+
+    print("─"*70)
+    print("DECISION TABLE LENGKAP (8 Rules):")
+    print("─"*70)
+    header_row = f"{'Kondisi/Aksi':<25} | R1  | R2  | R3  | R4  | R5  | R6  | R7  | R8"
+    print(header_row)
+    print("─"*70)
+
+    rules = [
+        # C1    C2    C3
+        (True,  True,  True ),   # R1
+        (True,  True,  False),   # R2
+        (True,  False, True ),   # R3
+        (True,  False, False),   # R4
+        (False, True,  True ),   # R5
+        (False, True,  False),   # R6
+        (False, False, True ),   # R7
+        (False, False, False),   # R8
+    ]
+
+    def sym(val):
+        return "  T  " if val else "  F  "
+
+    print(f"{'C1: Kehadiran ≥ 75%':<25} |{'|'.join(sym(r[0]) for r in rules)}")
+    print(f"{'C2: Nilai Akhir ≥ 60':<25} |{'|'.join(sym(r[1]) for r in rules)}")
+    print(f"{'C3: Status Lunas':<25} |{'|'.join(sym(r[2]) for r in rules)}")
+    print("─"*70)
+
+    # Tentukan aksi tiap rule
+    def get_aksi(c1, c2, c3):
+        if not c1: return "TIDAK"
+        if not c3: return "TIDAK"
+        if not c2: return "TIDAK"
+        return "LULUS"
+
+    aksi_list = [get_aksi(*r) for r in rules]
+    print(f"{'A: Keputusan':<25} |{'|'.join(f'  {a:<3}' for a in aksi_list)}")
+    print("─"*70)
+
+    print("""
+DECISION TABLE DISEDERHANAKAN (Reduced Rules):
+  Observasi: R5-R8 semuanya TIDAK LULUS (C1=F mendominasi)
+             R2, R3, R4 semuanya TIDAK LULUS (walaupun C1=T)
+  → Hanya R1 yang menghasilkan LULUS
+
+┌──────────────────────────┬──────┬──────────────────────────────────────┐
+│ Kondisi/Aksi             │  R1  │  R2 (Semua sisa rule)                │
+├──────────────────────────┼──────┼──────────────────────────────────────┤
+│ C1: Kehadiran ≥ 75%      │  T   │  T/F (jika F → langsung Tidak Lulus)│
+│ C2: Nilai Akhir ≥ 60     │  T   │  T/F                                 │
+│ C3: Status Lunas         │  T   │  T/F (salah satu F → Tidak Lulus)   │
+├──────────────────────────┼──────┼──────────────────────────────────────┤
+│ Keputusan                │ LULUS│  TIDAK LULUS                         │
+└──────────────────────────┴──────┴──────────────────────────────────────┘
+
+  Kesimpulan: LULUS hanya jika C1 ∧ C2 ∧ C3 = True
+              Apabila salah satu kondisi False → TIDAK LULUS
+""")
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# BAGIAN B: Test Case dari Decision Table
+# ─────────────────────────────────────────────────────────────────────────────
+
+def buat_test_cases_soal2():
+    """
+    Test case minimal 6 yang diturunkan dari decision table.
+    """
+    test_cases = [
+        # ID        Kehadiran  Nilai  Bayar         Expected       Deskripsi
+        ("TC-01",   80,        70,    "Lunas",       "LULUS",       "R1: Semua syarat terpenuhi → LULUS"),
+        ("TC-02",   75,        60,    "Lunas",       "LULUS",       "R1 Batas: Kehadiran=75, Nilai=60, Lunas → LULUS"),
+        ("TC-03",   60,        70,    "Lunas",       "TIDAK LULUS", "R5: Kehadiran<75% → TIDAK LULUS"),
+        ("TC-04",   80,        70,    "Tidak Lunas", "TIDAK LULUS", "R2: Pembayaran tidak lunas → TIDAK LULUS"),
+        ("TC-05",   80,        55,    "Lunas",       "TIDAK LULUS", "R3: Nilai Akhir<60 → TIDAK LULUS"),
+        ("TC-06",   74,        59,    "Tidak Lunas", "TIDAK LULUS", "R8: Semua syarat gagal → TIDAK LULUS"),
+        ("TC-07",   75,        60,    "Tidak Lunas", "TIDAK LULUS", "Batas kehadiran+nilai, tapi tdk lunas"),
+        ("TC-08",  100,       100,    "Lunas",       "LULUS",       "Semua nilai maksimal → LULUS"),
+        ("TC-09",   74.9,      60,    "Lunas",       "TIDAK LULUS", "Kehadiran tepat di bawah 75% → TIDAK LULUS"),
+        ("TC-10",   75,        59.9,  "Lunas",       "TIDAK LULUS", "Nilai tepat di bawah 60 → TIDAK LULUS"),
+    ]
+
+    hasil = []
+    for tc_id, kehadiran, nilai, bayar, expected, deskripsi in test_cases:
+        r = evaluasi_kelulusan(kehadiran, nilai, bayar)
+        passed = r['keputusan'] == expected
+        hasil.append({
+            "id"        : tc_id,
+            "kehadiran" : kehadiran,
+            "nilai"     : nilai,
+            "bayar"     : bayar,
+            "expected"  : expected,
+            "actual"    : r['keputusan'],
+            "alasan"    : r['alasan'],
+            "passed"    : passed,
+            "deskripsi" : deskripsi,
+        })
+    return hasil
+
+
+def tampilkan_hasil_soal2(test_cases):
+    print(f"\n{'='*100}")
+    print(" BAGIAN B & C: TEST CASE E-LEARNING - HASIL PENGUJIAN")
+    print(f"{'='*100}")
+    print(f"{'ID':<8} {'Hadir%':>7} {'Nilai':>7} {'Bayar':<14} {'Expected':<13} {'Actual':<13} {'Pass':>5}  Deskripsi")
+    print("-"*100)
+    for tc in test_cases:
+        p = "✓" if tc['passed'] else "✗"
+        print(f"{tc['id']:<8} {tc['kehadiran']:>7} {tc['nilai']:>7} {tc['bayar']:<14} "
+              f"{tc['expected']:<13} {tc['actual']:<13} {p:>5}  {tc['deskripsi']}")
+    passed = sum(1 for t in test_cases if t['passed'])
+    print(f"\n  Total: {len(test_cases)} test | PASS: {passed} | FAIL: {len(test_cases)-passed}")
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# BAGIAN D: Visualisasi dan Analisis
+# ─────────────────────────────────────────────────────────────────────────────
+
+def buat_grafik_soal2(test_cases):
+    import matplotlib.pyplot as plt
+    from collections import Counter
+
+    if not test_cases:
+        print("Tidak ada data")
+        return
+
+    keputusan_list = [tc['actual'] for tc in test_cases]
+    lulus     = keputusan_list.count("LULUS")
+    tdk_lulus = keputusan_list.count("TIDAK LULUS")
+
+    fig, axes = plt.subplots(1, 2, figsize=(12, 5))
+    fig.suptitle("Visualisasi Hasil Pengujian - Sistem E-Learning",
+                 fontsize=13, fontweight='bold')
+
+    # PIE
+    ax1 = axes[0]
+    sizes  = [lulus, tdk_lulus]
+    labels = [f'LULUS\n({lulus})', f'TIDAK LULUS\n({tdk_lulus})']
+    colors = ['#2ecc71', '#e74c3c']
+
+    ax1.pie(sizes, labels=labels, colors=colors,
+            autopct='%1.0f%%', startangle=90)
+    ax1.set_title("Perbandingan LULUS vs TIDAK LULUS")
+
+    # BAR
+    ax2 = axes[1]
+    alasan_count = Counter(tc['alasan'] for tc in test_cases)
+
+    ax2.barh(list(alasan_count.keys()), list(alasan_count.values()))
+    ax2.set_title("Distribusi Alasan")
+
+    plt.tight_layout()
+    plt.savefig("grafik_soal2.png")
+    print("Grafik disimpan sebagai grafik_soal2.png")
+
+
+def analisis_soal2(test_cases):
+    print(f"\n{'='*60}")
+    print(" ANALISIS HASIL PENGUJIAN SOAL 2")
+    print(f"{'='*60}")
+
+    lulus     = sum(1 for t in test_cases if t['actual'] == "LULUS")
+    tdk_lulus = sum(1 for t in test_cases if t['actual'] == "TIDAK LULUS")
+    print(f"  Total test case : {len(test_cases)}")
+    print(f"  LULUS           : {lulus} ({lulus/len(test_cases)*100:.0f}%)")
+    print(f"  TIDAK LULUS     : {tdk_lulus} ({tdk_lulus/len(test_cases)*100:.0f}%)")
+
+    # Cek rule coverage
+    rules_covered = {
+        "R1 (Semua syarat terpenuhi → LULUS)"       : any(t['actual']=="LULUS" for t in test_cases),
+        "R2 (Pembayaran tidak lunas → TIDAK LULUS)" : any(t['alasan']=="Pembayaran tidak lunas" for t in test_cases),
+        "R3 (Nilai < 60 → TIDAK LULUS)"             : any(t['alasan']=="Nilai Akhir < 60" for t in test_cases),
+        "Kehadiran < 75% → TIDAK LULUS"             : any(t['alasan']=="Kehadiran < 75%" for t in test_cases),
+        "Semua syarat gagal → TIDAK LULUS"          : any(t['kehadiran']<75 and t['nilai']<60 and t['bayar']!="Lunas"
+                                                           for t in test_cases),
+    }
+    print(f"\n  Rule Coverage:")
+    all_covered = True
+    for rule, covered in rules_covered.items():
+        status = "✓" if covered else "✗"
+        print(f"    {status} {rule}")
+        if not covered:
+            all_covered = False
+
+    if all_covered:
+        print("\n  ✓ Semua rule decision table sudah ter-cover oleh test case.")
+    else:
+        print("\n  ✗ Ada rule yang belum ter-cover. Tambahkan test case.")
+
+    passed = sum(1 for t in test_cases if t['passed'])
+    print(f"\n  Hasil Pass/Fail: PASS={passed} | FAIL={len(test_cases)-passed}")
+    print("\n  Kesimpulan:")
+    print("    Sistem e-learning mengikuti logika konjungtif (AND): LULUS hanya")
+    print("    jika ketiga kondisi terpenuhi. Satu kondisi gagal = TIDAK LULUS.")
+    print("    Tidak ditemukan anomali pada hasil pengujian.")
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# MAIN
+# ─────────────────────────────────────────────────────────────────────────────
+
+if __name__ == "__main__":
+    print("  PENGUJIAN SISTEM E-LEARNING")
+    cetak_decision_table()
+    tc = buat_test_cases_soal2()
+    tampilkan_hasil_soal2(tc)
+    analisis_soal2(tc)
+    buat_grafik_soal2(tc)
